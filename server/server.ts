@@ -56,7 +56,7 @@ app.post('/analyze', async (req: Request, res: Response) => {
     let systemInstruction = '';
 
     if (platform === 'tiktok' || platform === 'youtube') {
-      systemInstruction = "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it, including preparation time, cook time, and servings if mentioned. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
+      systemInstruction = "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
       
       let videoTitle = '';
       let videoAuthor = '';
@@ -83,11 +83,11 @@ app.post('/analyze', async (req: Request, res: Response) => {
       const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
       const titleAuthorInfo = (videoTitle && videoAuthor) ? `titled "${videoTitle}" by author "${videoAuthor}"` : '';
 
-      prompt = `From the ${platformName} video ${titleAuthorInfo} (URL: ${sourceUrl}), please extract the detailed recipe. Include ingredients, step-by-step instructions, preparation time, cook time, and number of servings if available.`;
+      prompt = `Analyze the ${platformName} video ${titleAuthorInfo} available at this URL: ${sourceUrl}. Extract a detailed recipe from the video's content. Your response must include the following details if they are available: ingredients with precise quantities, step-by-step instructions for preparation, the preparation time, the cooking time, and the number of servings this recipe yields.`;
 
     } else { // 'website'
       systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage, including any images. Ignore all non-recipe content like headers, footers, navigation bars, ads, and user comments. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
-      prompt = `Please extract the detailed recipe from the content of the following URL: ${sourceUrl}. Include the recipe name, description, ingredients, step-by-step instructions, preparation time, cook time, number of servings, and URLs of relevant images (like the final dish and step-by-step photos) with descriptions.`;
+      prompt = `Scrape the recipe from the webpage at this URL: ${sourceUrl}. Extract the following details: the recipe's name, a brief description of the dish, all ingredients with their quantities, the complete step-by-step instructions, the preparation time, the cooking time, the number of servings, and all relevant images. For each image, you must provide its full, direct URL and a concise description of what the image shows.`;
     }
 
     console.log("Using prompt:", prompt);
@@ -149,6 +149,25 @@ app.post('/analyze', async (req: Request, res: Response) => {
       console.error('Failed to parse Gemini response:', recipeJsonString, parseError);
       return res.status(500).json({ error: 'Failed to parse recipe data from AI. The format was invalid.' });
     }
+
+    // Fix image URLs to be absolute
+    if (recipe.images && platform === 'website') {
+      recipe.images = recipe.images
+        .map(image => {
+          if (!image.url) return null; // Filter out images without URLs
+          try {
+            // Resolve relative URLs against the source URL of the recipe page
+            const absoluteUrl = new URL(image.url, sourceUrl).href;
+            return { ...image, url: absoluteUrl };
+          } catch (e) {
+            // If URL is invalid (e.g., malformed), filter it out
+            console.warn(`Invalid image URL found and skipped: ${image.url}`);
+            return null;
+          }
+        })
+        .filter((image): image is RecipeImage => image !== null);
+    }
+
 
     // Generate HTML on the backend
     const additionalInfoHtml = [
