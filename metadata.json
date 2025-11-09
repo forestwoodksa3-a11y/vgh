@@ -1,5 +1,5 @@
 {
-  "name": "Universal AI Recipe Finder",
-  "description": "An intelligent web application that uses Gemini to extract recipes from any URL, whether it's a video from TikTok, YouTube, and Instagram, or a recipe from a website.",
+  "name": "Copy of Gemini Video Analyzer",
+  "description": "An intelligent web application that uses Gemini to analyze video content. Upload a video, provide a prompt, and receive a detailed, AI-generated analysis of the video's content.",
   "requestFramePermissions": []
 }

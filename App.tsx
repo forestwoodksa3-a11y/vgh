@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { getRecipeFromUrl } from './services/geminiService';
+import { analyzeVideo } from './services/geminiService';
 import { RecipeIcon } from './components/icons';
 import Loader from './components/Loader';
 
@@ -11,14 +11,14 @@ interface Recipe {
 }
 
 function App() {
-  const [sourceUrl, setSourceUrl] = useState<string>('');
+  const [videoUrl, setVideoUrl] = useState<string>('');
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGetRecipeClick = useCallback(async () => {
-    if (!sourceUrl) {
-      setError('Please provide a URL.');
+  const handleAnalyzeClick = useCallback(async () => {
+    if (!videoUrl) {
+      setError('Please provide a video URL.');
       return;
     }
 
@@ -27,7 +27,7 @@ function App() {
     setRecipe(null);
 
     try {
-      const resultJson = await getRecipeFromUrl(sourceUrl);
+      const resultJson = await analyzeVideo(videoUrl);
       const parsedRecipe: Recipe = JSON.parse(resultJson);
       setRecipe(parsedRecipe);
     } catch (err) {
@@ -37,38 +37,38 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [sourceUrl]);
+  }, [videoUrl]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-6xl mx-auto">
         <header className="text-center mb-8">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600">
-            Universal AI Recipe Finder
+            Video Recipe Finder
           </h1>
           <p className="mt-2 text-lg text-gray-400">
-            Paste any video or website URL to instantly extract the recipe.
+            Paste a TikTok, YouTube, or Instagram video URL to extract the recipe.
           </p>
         </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="flex flex-col space-y-6 bg-gray-800 p-6 rounded-2xl shadow-lg">
             <div className="flex flex-col">
-              <label htmlFor="sourceUrl" className="mb-2 font-semibold text-gray-300">Recipe URL</label>
+              <label htmlFor="videoUrl" className="mb-2 font-semibold text-gray-300">Video URL</label>
               <input
-                id="sourceUrl"
+                id="videoUrl"
                 type="url"
-                value={sourceUrl}
-                onChange={(e) => setSourceUrl(e.target.value)}
-                placeholder="https://... (any recipe video or website)"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://www.tiktok.com/... or https://youtube.com/..."
                 className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
                 disabled={isLoading}
               />
             </div>
 
             <button
-              onClick={handleGetRecipeClick}
-              disabled={isLoading || !sourceUrl}
+              onClick={handleAnalyzeClick}
+              disabled={isLoading || !videoUrl}
               className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity duration-200"
             >
               {isLoading ? (
@@ -91,7 +91,7 @@ function App() {
               {isLoading && (
                 <div className="flex flex-col items-center justify-center h-full">
                   <Loader />
-                  <p className="mt-4 text-gray-400">Finding your recipe...</p>
+                  <p className="mt-4 text-gray-400">Finding recipe in video...</p>
                 </div>
               )}
               {error && <p className="text-red-400 whitespace-pre-wrap">{error}</p>}

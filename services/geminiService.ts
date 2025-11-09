@@ -1,5 +1,5 @@
-export async function getRecipeFromUrl(
-  sourceUrl: string,
+export async function analyzeVideo(
+  videoUrl: string,
 ): Promise<string> {
   // This should point to your backend server.
   // For local development, the Express server runs on port 3001.
@@ -11,7 +11,7 @@ export async function getRecipeFromUrl(
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ sourceUrl }),
+        body: JSON.stringify({ videoUrl }),
     });
 
     if (!response.ok) {

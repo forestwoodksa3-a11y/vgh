@@ -1,5 +1,8 @@
-// Fix: Changed express import to default and used qualified types to fix type resolution errors.
-import express from 'express';
+// FIX: The aliased import of Request and Response was not sufficient to resolve
+// type conflicts with global DOM types. Using namespaced types from the 'express'
+// import (e.g., express.Request) is a more robust way to prevent these issues.
+// FIX: Explicitly import Request and Response types from 'express' to resolve type conflicts with global DOM types, which was causing errors throughout the file.
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { GoogleGenAI, Type } from '@google/genai';
 import { config } from 'dotenv';
@@ -13,52 +16,44 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
-type Platform = 'tiktok' | 'youtube' | 'instagram' | 'website';
+type Platform = 'tiktok' | 'youtube' | 'instagram' | 'unknown';
 
 const getPlatform = (url: string): Platform => {
   if (url.includes('tiktok.com')) return 'tiktok';
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
   if (url.includes('instagram.com')) return 'instagram';
-  return 'website';
+  return 'unknown';
 }
 
-// Fix: Use qualified types for Request and Response from the express import.
-app.post('/analyze', async (req: express.Request, res: express.Response) => {
-  const { sourceUrl } = req.body;
+// FIX: Use the imported Request and Response types to ensure the handler parameters have the correct Express types.
+app.post('/analyze', async (req: Request, res: Response) => {
+  const { videoUrl } = req.body;
 
-  if (!sourceUrl) {
-    return res.status(400).json({ error: 'Missing sourceUrl in request body' });
+  if (!videoUrl) {
+    return res.status(400).json({ error: 'Missing videoUrl in request body' });
   }
 
   if (!process.env.API_KEY) {
     return res.status(500).json({ error: 'API_KEY is not configured on the server.' });
   }
 
-  const platform = getPlatform(sourceUrl);
+  const platform = getPlatform(videoUrl);
 
-  // Handle unsupported Instagram URLs gracefully before making an API call
-  if (platform === 'instagram') {
-    return res.status(400).json({ 
-      error: "Recipe extraction from Instagram is not supported due to their strict content privacy and access restrictions. Please try a URL from TikTok, YouTube, or a public recipe website." 
-    });
+  if (platform === 'unknown') {
+    return res.status(400).json({ error: 'Unsupported video URL. Please use a valid TikTok, YouTube, or Instagram URL.' });
   }
 
   try {
+    let videoTitle = '';
+    let videoAuthor = '';
     let prompt = '';
-    let systemInstruction = '';
 
+    // For TikTok and YouTube, we can try to fetch metadata to improve accuracy
     if (platform === 'tiktok' || platform === 'youtube') {
-      // Logic for Supported Video Platforms
-      systemInstruction = "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
-      
-      let videoTitle = '';
-      let videoAuthor = '';
-      
-      // For TikTok and YouTube, we can try to fetch metadata to improve accuracy
       try {
         const oembedUrl = platform === 'tiktok'
-          ? `https://www.tiktok.com/oembed?url=${encodeURIComponent(sourceUrl)}`
-          : `https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}`;
+          ? `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`
+          : `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}`;
           
         console.log(`Fetching metadata for ${platform}: ${oembedUrl}`);
         const oembedResponse = await fetch(oembedUrl);
@@ -73,21 +68,16 @@ app.post('/analyze', async (req: express.Request, res: express.Response) => {
       } catch (oembedError) {
         console.warn(`Failed to fetch or parse ${platform} oEmbed data:`, oembedError);
       }
+    }
 
-      // Construct the prompt based on available data
-      const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
-      if (videoTitle && videoAuthor) {
-        prompt = `From the ${platformName} video titled "${videoTitle}" by author "${videoAuthor}" (URL: ${sourceUrl}), please extract the recipe.`;
-      } else {
-        // Fallback if metadata fetch fails
-        console.warn('Falling back to basic prompt for URL:', sourceUrl);
-        prompt = `From the ${platformName} video at ${sourceUrl}, extract the recipe.`;
-      }
-
+    // Construct the prompt based on available data
+    const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+    if (videoTitle && videoAuthor) {
+      prompt = `From the ${platformName} video titled "${videoTitle}" by author "${videoAuthor}" (URL: ${videoUrl}), please extract the recipe.`;
     } else {
-      // Logic for General Websites
-      systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage. Ignore all non-recipe content like headers, footers, navigation bars, ads, and user comments. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
-      prompt = `Please extract the recipe from the content of the following URL: ${sourceUrl}.`;
+      // Fallback for Instagram or if metadata fetch fails
+      console.warn('Falling back to basic prompt for URL:', videoUrl);
+      prompt = `From the ${platformName} video at ${videoUrl}, extract the recipe.`;
     }
 
     console.log("Using prompt:", prompt);
@@ -127,7 +117,7 @@ app.post('/analyze', async (req: express.Request, res: express.Response) => {
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction,
+        systemInstruction: "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.",
         responseMimeType: "application/json",
         responseSchema: recipeSchema,
       },
