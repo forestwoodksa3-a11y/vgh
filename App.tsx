@@ -3,16 +3,9 @@ import { analyzeVideo } from './services/geminiService';
 import { RecipeIcon } from './components/icons';
 import Loader from './components/Loader';
 
-interface Recipe {
-  recipeName: string;
-  description: string;
-  ingredients: string[];
-  instructions: string[];
-}
-
 function App() {
   const [videoUrl, setVideoUrl] = useState<string>('');
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [recipeHtml, setRecipeHtml] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,12 +17,11 @@ function App() {
 
     setIsLoading(true);
     setError(null);
-    setRecipe(null);
+    setRecipeHtml(null);
 
     try {
-      const resultJson = await analyzeVideo(videoUrl);
-      const parsedRecipe: Recipe = JSON.parse(resultJson);
-      setRecipe(parsedRecipe);
+      const html = await analyzeVideo(videoUrl);
+      setRecipeHtml(html);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(`Failed to get recipe: ${errorMessage}`);
@@ -95,27 +87,10 @@ function App() {
                 </div>
               )}
               {error && <p className="text-red-400 whitespace-pre-wrap">{error}</p>}
-              {recipe && (
-                <div>
-                  <h3 className="text-2xl font-bold !text-purple-300 !mt-0">{recipe.recipeName}</h3>
-                  <p className="!text-gray-300 italic">{recipe.description}</p>
-                  
-                  <h4 className="text-xl font-bold !text-indigo-300 mt-6 mb-2">Ingredients</h4>
-                  <ul className="list-disc list-inside !text-gray-300 space-y-1">
-                    {recipe.ingredients.map((item, index) => (
-                      <li key={`ing-${index}`}>{item}</li>
-                    ))}
-                  </ul>
-
-                  <h4 className="text-xl font-bold !text-indigo-300 mt-6 mb-2">Instructions</h4>
-                  <ol className="list-decimal list-inside !text-gray-300 space-y-2">
-                     {recipe.instructions.map((item, index) => (
-                      <li key={`inst-${index}`}>{item}</li>
-                    ))}
-                  </ol>
-                </div>
+              {recipeHtml && (
+                <div dangerouslySetInnerHTML={{ __html: recipeHtml }} />
               )}
-              {!isLoading && !error && !recipe && (
+              {!isLoading && !error && !recipeHtml && (
                 <div className="flex items-center justify-center h-full text-center text-gray-500">
                   <p>Your recipe will appear here.</p>
                 </div>

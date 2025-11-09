@@ -11,7 +11,7 @@ export async function analyzeVideo(
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ videoUrl }),
+        body: JSON.stringify({ sourceUrl: videoUrl }),
     });
 
     if (!response.ok) {
@@ -20,7 +20,10 @@ export async function analyzeVideo(
     }
 
     const data = await response.json();
-    return data.recipe;
+    if (!data.html) {
+        throw new Error("Backend response is missing the recipe HTML.");
+    }
+    return data.html;
   } catch(e) {
       console.error(e);
       if (e instanceof Error) {

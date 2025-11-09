@@ -118,6 +118,12 @@ app.post('/analyze', async (req: Request, res: Response) => {
     });
 
     const recipeJsonString = genAIResponse.text;
+    
+    if (!recipeJsonString) {
+      console.error('Gemini API returned an empty response.');
+      return res.status(500).json({ error: 'Failed to get recipe data from AI. The response was empty.' });
+    }
+
     let recipe: Recipe;
     try {
       recipe = JSON.parse(recipeJsonString);
