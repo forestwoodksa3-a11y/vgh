@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { analyzeVideo } from './services/geminiService';
+import { analyzeVideo, RecipeData } from './services/geminiService';
 import { RecipeIcon } from './components/icons';
 import Loader from './components/Loader';
+import RecipeDisplay from './components/RecipeDisplay';
 
 function App() {
   const [videoUrl, setVideoUrl] = useState<string>('');
-  const [recipeHtml, setRecipeHtml] = useState<string | null>(null);
+  const [recipe, setRecipe] = useState<RecipeData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,11 +18,11 @@ function App() {
 
     setIsLoading(true);
     setError(null);
-    setRecipeHtml(null);
+    setRecipe(null);
 
     try {
-      const html = await analyzeVideo(videoUrl);
-      setRecipeHtml(html);
+      const data = await analyzeVideo(videoUrl);
+      setRecipe(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(`Failed to get recipe: ${errorMessage}`);
@@ -79,7 +80,7 @@ function App() {
 
           <div className="bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col">
             <h2 className="text-2xl font-bold mb-4 text-gray-200">Your Recipe</h2>
-            <div className="flex-grow w-full overflow-y-auto p-4 bg-gray-900/50 rounded-lg prose prose-invert max-w-none">
+            <div className="flex-grow w-full overflow-y-auto p-4 bg-gray-900/50 rounded-lg max-w-none">
               {isLoading && (
                 <div className="flex flex-col items-center justify-center h-full">
                   <Loader />
@@ -87,10 +88,10 @@ function App() {
                 </div>
               )}
               {error && <p className="text-red-400 whitespace-pre-wrap">{error}</p>}
-              {recipeHtml && (
-                <div dangerouslySetInnerHTML={{ __html: recipeHtml }} />
-              )}
-              {!isLoading && !error && !recipeHtml && (
+              
+              {recipe && <RecipeDisplay recipe={recipe} />}
+              
+              {!isLoading && !error && !recipe && (
                 <div className="flex items-center justify-center h-full text-center text-gray-500">
                   <p>Your recipe will appear here.</p>
                 </div>

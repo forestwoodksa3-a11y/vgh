@@ -1,6 +1,21 @@
+// This type defines the structured recipe data the frontend will work with.
+export interface RecipeData {
+  title: string;
+  description: string;
+  prep_time: number;
+  cook_time: number;
+  total_time: number;
+  yields: number;
+  ingredients: string[];
+  instructions: string[];
+  image: string | null;
+  url: string;
+  host: string;
+}
+
 export async function analyzeVideo(
   videoUrl: string,
-): Promise<string> {
+): Promise<RecipeData> {
   // This should point to your backend server.
   // For local development, the Express server runs on port 3001.
   const backendUrl = 'http://localhost:3001/analyze';
@@ -14,16 +29,17 @@ export async function analyzeVideo(
         body: JSON.stringify({ sourceUrl: videoUrl }),
     });
 
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Request to backend failed');
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Request to backend failed');
     }
 
-    const data = await response.json();
-    if (!data.html) {
-        throw new Error("Backend response is missing the recipe HTML.");
+    if (!data.data) {
+        throw new Error("Backend response is missing the recipe data.");
     }
-    return data.html;
+    return data.data;
+
   } catch(e) {
       console.error(e);
       if (e instanceof Error) {
