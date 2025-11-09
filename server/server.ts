@@ -15,11 +15,20 @@ app.use(express.json());
 
 type Platform = 'tiktok' | 'youtube' | 'website';
 
+interface RecipeImage {
+  url: string;
+  description: string;
+}
+
 interface Recipe {
   recipeName: string;
   description: string;
+  prepTime?: string;
+  cookTime?: string;
+  servings?: string;
   ingredients: string[];
   instructions: string[];
+  images?: RecipeImage[];
 }
 
 const getPlatform = (url: string): Platform => {
@@ -47,7 +56,7 @@ app.post('/analyze', async (req: Request, res: Response) => {
     let systemInstruction = '';
 
     if (platform === 'tiktok' || platform === 'youtube') {
-      systemInstruction = "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
+      systemInstruction = "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it, including preparation time, cook time, and servings if mentioned. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
       
       let videoTitle = '';
       let videoAuthor = '';
@@ -72,29 +81,47 @@ app.post('/analyze', async (req: Request, res: Response) => {
       }
 
       const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
-      if (videoTitle && videoAuthor) {
-        prompt = `From the ${platformName} video titled "${videoTitle}" by author "${videoAuthor}" (URL: ${sourceUrl}), please extract the recipe.`;
-      } else {
-        console.warn('Falling back to basic prompt for URL:', sourceUrl);
-        prompt = `From the ${platformName} video at ${sourceUrl}, extract the recipe.`;
-      }
+      const titleAuthorInfo = (videoTitle && videoAuthor) ? `titled "${videoTitle}" by author "${videoAuthor}"` : '';
+
+      prompt = `From the ${platformName} video ${titleAuthorInfo} (URL: ${sourceUrl}), please extract the detailed recipe. Include ingredients, step-by-step instructions, preparation time, cook time, and number of servings if available.`;
+
     } else { // 'website'
-      systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage. Ignore all non-recipe content like headers, footers, navigation bars, ads, and user comments. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
-      prompt = `Please extract the recipe from the content of the following URL: ${sourceUrl}.`;
+      systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage, including any images. Ignore all non-recipe content like headers, footers, navigation bars, ads, and user comments. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
+      prompt = `Please extract the detailed recipe from the content of the following URL: ${sourceUrl}. Include the recipe name, description, ingredients, step-by-step instructions, preparation time, cook time, number of servings, and URLs of relevant images (like the final dish and step-by-step photos) with descriptions.`;
     }
 
     console.log("Using prompt:", prompt);
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
+    const properties: any = {
+      recipeName: { type: Type.STRING, description: "The title or name of the recipe." },
+      description: { type: Type.STRING, description: "A brief, enticing description of the dish." },
+      prepTime: { type: Type.STRING, description: "Preparation time, e.g., '15 minutes'." },
+      cookTime: { type: Type.STRING, description: "Cooking time, e.g., '30 minutes'." },
+      servings: { type: Type.STRING, description: "Number of servings the recipe makes, e.g., '4 servings'." },
+      ingredients: { type: Type.ARRAY, description: "A list of all ingredients with quantities.", items: { type: Type.STRING } },
+      instructions: { type: Type.ARRAY, description: "A step-by-step list of instructions.", items: { type: Type.STRING } },
+    };
+
+    if (platform === 'website') {
+      properties.images = { 
+        type: Type.ARRAY, 
+        description: "A list of relevant image URLs from the webpage, including the main dish photo and any step-by-step images. For each image, provide its full URL and a brief description of what it depicts.",
+        items: { 
+          type: Type.OBJECT, 
+          properties: {
+            url: { type: Type.STRING, description: "The full, direct URL to the image file." },
+            description: { type: Type.STRING, description: "A brief description of the image content." }
+          },
+          required: ["url", "description"]
+        } 
+      };
+    }
+
     const recipeSchema = {
       type: Type.OBJECT,
-      properties: {
-        recipeName: { type: Type.STRING, description: "The title or name of the recipe." },
-        description: { type: Type.STRING, description: "A brief, enticing description of the dish." },
-        ingredients: { type: Type.ARRAY, description: "A list of all ingredients with quantities.", items: { type: Type.STRING } },
-        instructions: { type: Type.ARRAY, description: "A step-by-step list of instructions.", items: { type: Type.STRING } },
-      },
+      properties,
       required: ["recipeName", "description", "ingredients", "instructions"],
     };
 
@@ -124,23 +151,50 @@ app.post('/analyze', async (req: Request, res: Response) => {
     }
 
     // Generate HTML on the backend
+    const additionalInfoHtml = [
+      recipe.prepTime ? `<li><strong class="font-semibold text-indigo-400">Prep Time:</strong> ${recipe.prepTime}</li>` : '',
+      recipe.cookTime ? `<li><strong class="font-semibold text-indigo-400">Cook Time:</strong> ${recipe.cookTime}</li>` : '',
+      recipe.servings ? `<li><strong class="font-semibold text-indigo-400">Servings:</strong> ${recipe.servings}</li>` : '',
+    ].filter(Boolean).join('');
+
+    const imagesHtml = recipe.images?.map(img => `
+      <figure class="my-4">
+        <img src="${img.url}" alt="${img.description}" class="w-full h-auto rounded-lg shadow-md object-cover" loading="lazy" />
+        <figcaption class="text-center text-sm text-gray-400 mt-2">${img.description}</figcaption>
+      </figure>
+    `).join('') || '';
+
     const ingredientsHtml = recipe.ingredients.map(item => `<li>${item}</li>`).join('');
     const instructionsHtml = recipe.instructions.map(item => `<li>${item}</li>`).join('');
 
     const recipeHtml = `
       <div>
-        <h3 class="text-2xl font-bold !text-purple-300 !mt-0">${recipe.recipeName}</h3>
-        <p class="!text-gray-300 italic">${recipe.description}</p>
+        ${imagesHtml.length > 0 ? `<div class="mb-6">${imagesHtml}</div>` : ''}
+        <h3 class="text-3xl font-bold !text-purple-300 !mt-0">${recipe.recipeName}</h3>
+        <p class="!text-gray-300 italic mt-2">${recipe.description}</p>
         
-        <h4 class="text-xl font-bold !text-indigo-300 mt-6 mb-2">Ingredients</h4>
-        <ul class="list-disc list-inside !text-gray-300 space-y-1">
-          ${ingredientsHtml}
-        </ul>
-
-        <h4 class="text-xl font-bold !text-indigo-300 mt-6 mb-2">Instructions</h4>
-        <ol class="list-decimal list-inside !text-gray-300 space-y-2">
-          ${instructionsHtml}
-        </ol>
+        ${additionalInfoHtml.length > 0 ? `
+          <div class="my-6 p-4 bg-gray-900/70 rounded-lg border border-gray-700">
+            <ul class="flex flex-wrap items-center gap-x-6 gap-y-2 !text-gray-300">
+              ${additionalInfoHtml}
+            </ul>
+          </div>
+        ` : ''}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 mt-6">
+          <div>
+            <h4 class="text-xl font-bold !text-indigo-300 mb-2">Ingredients</h4>
+            <ul class="list-disc list-inside !text-gray-300 space-y-1">
+              ${ingredientsHtml}
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-xl font-bold !text-indigo-300 mb-2">Instructions</h4>
+            <ol class="list-decimal list-inside !text-gray-300 space-y-2">
+              ${instructionsHtml}
+            </ol>
+          </div>
+        </div>
       </div>
     `;
 

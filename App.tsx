@@ -79,7 +79,7 @@ function App() {
 
           <div className="bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col">
             <h2 className="text-2xl font-bold mb-4 text-gray-200">Your Recipe</h2>
-            <div className="flex-grow w-full h-96 overflow-y-auto p-4 bg-gray-900/50 rounded-lg prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-gray-100">
+            <div className="flex-grow w-full overflow-y-auto p-4 bg-gray-900/50 rounded-lg prose prose-invert max-w-none">
               {isLoading && (
                 <div className="flex flex-col items-center justify-center h-full">
                   <Loader />
