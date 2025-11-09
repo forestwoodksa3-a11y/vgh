@@ -1,7 +1,8 @@
 // FIX: The aliased import of Request and Response was not sufficient to resolve
 // type conflicts with global DOM types. Using namespaced types from the 'express'
 // import (e.g., express.Request) is a more robust way to prevent these issues.
-import express from 'express';
+// FIX: Explicitly import Request and Response types from 'express' to resolve type conflicts with global DOM types, which was causing errors throughout the file.
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { GoogleGenAI, Type } from '@google/genai';
 import { config } from 'dotenv';
@@ -15,47 +16,69 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
-app.post('/analyze', async (req: express.Request, res: express.Response) => {
-  const { tiktokUrl } = req.body;
+type Platform = 'tiktok' | 'youtube' | 'instagram' | 'unknown';
 
-  if (!tiktokUrl) {
-    return res.status(400).json({ error: 'Missing tiktokUrl in request body' });
+const getPlatform = (url: string): Platform => {
+  if (url.includes('tiktok.com')) return 'tiktok';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  if (url.includes('instagram.com')) return 'instagram';
+  return 'unknown';
+}
+
+// FIX: Use the imported Request and Response types to ensure the handler parameters have the correct Express types.
+app.post('/analyze', async (req: Request, res: Response) => {
+  const { videoUrl } = req.body;
+
+  if (!videoUrl) {
+    return res.status(400).json({ error: 'Missing videoUrl in request body' });
   }
 
   if (!process.env.API_KEY) {
     return res.status(500).json({ error: 'API_KEY is not configured on the server.' });
   }
 
+  const platform = getPlatform(videoUrl);
+
+  if (platform === 'unknown') {
+    return res.status(400).json({ error: 'Unsupported video URL. Please use a valid TikTok, YouTube, or Instagram URL.' });
+  }
+
   try {
-    // --- New logic to fetch video metadata for a more accurate prompt ---
     let videoTitle = '';
     let videoAuthor = '';
     let prompt = '';
 
-    try {
-      console.log(`Fetching metadata for: ${tiktokUrl}`);
-      const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(tiktokUrl)}`;
-      const oembedResponse = await fetch(oembedUrl);
-      if (oembedResponse.ok) {
-        const oembedData = await oembedResponse.json();
-        videoTitle = oembedData.title || '';
-        videoAuthor = oembedData.author_name || '';
-        console.log(`Found metadata: Title - "${videoTitle}", Author - "${videoAuthor}"`);
-      } else {
-        console.warn(`Could not fetch TikTok oEmbed metadata. Status: ${oembedResponse.status}`);
+    // For TikTok and YouTube, we can try to fetch metadata to improve accuracy
+    if (platform === 'tiktok' || platform === 'youtube') {
+      try {
+        const oembedUrl = platform === 'tiktok'
+          ? `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`
+          : `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}`;
+          
+        console.log(`Fetching metadata for ${platform}: ${oembedUrl}`);
+        const oembedResponse = await fetch(oembedUrl);
+        if (oembedResponse.ok) {
+          const oembedData = await oembedResponse.json();
+          videoTitle = oembedData.title || '';
+          videoAuthor = oembedData.author_name || '';
+          console.log(`Found metadata: Title - "${videoTitle}", Author - "${videoAuthor}"`);
+        } else {
+          console.warn(`Could not fetch ${platform} oEmbed metadata. Status: ${oembedResponse.status}`);
+        }
+      } catch (oembedError) {
+        console.warn(`Failed to fetch or parse ${platform} oEmbed data:`, oembedError);
       }
-    } catch (oembedError) {
-      console.warn('Failed to fetch or parse TikTok oEmbed data:', oembedError);
     }
 
+    // Construct the prompt based on available data
+    const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
     if (videoTitle && videoAuthor) {
-      prompt = `From the TikTok video titled "${videoTitle}" by author "${videoAuthor}" (URL: ${tiktokUrl}), please extract the recipe.`;
+      prompt = `From the ${platformName} video titled "${videoTitle}" by author "${videoAuthor}" (URL: ${videoUrl}), please extract the recipe.`;
     } else {
-      // Fallback to the original prompt if metadata couldn't be fetched
-      console.warn('Falling back to basic prompt.');
-      prompt = `From the TikTok video at ${tiktokUrl}, extract the recipe.`;
+      // Fallback for Instagram or if metadata fetch fails
+      console.warn('Falling back to basic prompt for URL:', videoUrl);
+      prompt = `From the ${platformName} video at ${videoUrl}, extract the recipe.`;
     }
-    // --- End of new logic ---
 
     console.log("Using prompt:", prompt);
     
@@ -94,7 +117,7 @@ app.post('/analyze', async (req: express.Request, res: express.Response) => {
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction: "You are an expert recipe bot. Your task is to analyze a TikTok video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.",
+        systemInstruction: "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.",
         responseMimeType: "application/json",
         responseSchema: recipeSchema,
       },

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { analyzeTiktokVideo } from './services/geminiService';
+import { analyzeVideo } from './services/geminiService';
 import { RecipeIcon } from './components/icons';
 import Loader from './components/Loader';
 
@@ -11,14 +11,14 @@ interface Recipe {
 }
 
 function App() {
-  const [tiktokUrl, setTiktokUrl] = useState<string>('');
+  const [videoUrl, setVideoUrl] = useState<string>('');
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleAnalyzeClick = useCallback(async () => {
-    if (!tiktokUrl) {
-      setError('Please provide a TikTok URL.');
+    if (!videoUrl) {
+      setError('Please provide a video URL.');
       return;
     }
 
@@ -27,7 +27,7 @@ function App() {
     setRecipe(null);
 
     try {
-      const resultJson = await analyzeTiktokVideo(tiktokUrl);
+      const resultJson = await analyzeVideo(videoUrl);
       const parsedRecipe: Recipe = JSON.parse(resultJson);
       setRecipe(parsedRecipe);
     } catch (err) {
@@ -37,30 +37,30 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [tiktokUrl]);
+  }, [videoUrl]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-6xl mx-auto">
         <header className="text-center mb-8">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600">
-            TikTok Recipe Finder
+            Video Recipe Finder
           </h1>
           <p className="mt-2 text-lg text-gray-400">
-            Paste a TikTok video URL to extract the recipe, powered by Gemini.
+            Paste a TikTok, YouTube, or Instagram video URL to extract the recipe.
           </p>
         </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="flex flex-col space-y-6 bg-gray-800 p-6 rounded-2xl shadow-lg">
             <div className="flex flex-col">
-              <label htmlFor="tiktokUrl" className="mb-2 font-semibold text-gray-300">TikTok URL</label>
+              <label htmlFor="videoUrl" className="mb-2 font-semibold text-gray-300">Video URL</label>
               <input
-                id="tiktokUrl"
+                id="videoUrl"
                 type="url"
-                value={tiktokUrl}
-                onChange={(e) => setTiktokUrl(e.target.value)}
-                placeholder="https://www.tiktok.com/@user/video/123..."
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://www.tiktok.com/... or https://youtube.com/..."
                 className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
                 disabled={isLoading}
               />
@@ -68,7 +68,7 @@ function App() {
 
             <button
               onClick={handleAnalyzeClick}
-              disabled={isLoading || !tiktokUrl}
+              disabled={isLoading || !videoUrl}
               className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity duration-200"
             >
               {isLoading ? (

@@ -1,5 +1,5 @@
-export async function analyzeTiktokVideo(
-  tiktokUrl: string,
+export async function analyzeVideo(
+  videoUrl: string,
 ): Promise<string> {
   // This should point to your backend server.
   // For local development, the Express server runs on port 3001.
@@ -11,7 +11,7 @@ export async function analyzeTiktokVideo(
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ tiktokUrl }),
+        body: JSON.stringify({ videoUrl }),
     });
 
     if (!response.ok) {
