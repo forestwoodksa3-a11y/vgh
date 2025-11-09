@@ -3,8 +3,6 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { GoogleGenAI, Type } from '@google/genai';
 import { config } from 'dotenv';
-// Fix: Import 'process' to provide correct types for 'process.hrtime'.
-import { process } from 'process';
 
 // Load environment variables from .env file
 config();
@@ -66,7 +64,8 @@ const parseNumericValue = (text?: string): number => {
 
 // Fix: Use the imported Request and Response types for the route handler.
 app.post('/analyze', async (req: Request, res: Response) => {
-  const startTime = process.hrtime();
+  // Fix: Replaced process.hrtime() with Date.now() for better portability.
+  const startTime = Date.now();
   const { sourceUrl } = req.body;
 
   if (!sourceUrl) {
@@ -204,8 +203,9 @@ From the video, extract the following information with the highest possible accu
         .filter((image): image is RecipeImage => image !== null);
     }
 
-    const endTime = process.hrtime(startTime);
-    const processingTime = parseFloat(((endTime[0] * 1e9 + endTime[1]) / 1e9).toFixed(3));
+    // Fix: Replaced process.hrtime() with Date.now() and updated calculation.
+    const endTime = Date.now();
+    const processingTime = parseFloat(((endTime - startTime) / 1000).toFixed(3));
 
     const mainImage = recipe.images?.find(img => img.category === 'main') || recipe.images?.[0] || null;
 
