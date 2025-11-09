@@ -1,6 +1,7 @@
-// FIX: Alias Request and Response to ExpressRequest and ExpressResponse to prevent
-// potential type conflicts with global DOM types that can cause compilation errors.
-import express, { Request as ExpressRequest, Response as ExpressResponse } from 'express';
+// FIX: The aliased import of Request and Response was not sufficient to resolve
+// type conflicts with global DOM types. Using namespaced types from the 'express'
+// import (e.g., express.Request) is a more robust way to prevent these issues.
+import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI, Type } from '@google/genai';
 import { config } from 'dotenv';
@@ -14,7 +15,7 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
-app.post('/analyze', async (req: ExpressRequest, res: ExpressResponse) => {
+app.post('/analyze', async (req: express.Request, res: express.Response) => {
   const { tiktokUrl } = req.body;
 
   if (!tiktokUrl) {
@@ -26,6 +27,38 @@ app.post('/analyze', async (req: ExpressRequest, res: ExpressResponse) => {
   }
 
   try {
+    // --- New logic to fetch video metadata for a more accurate prompt ---
+    let videoTitle = '';
+    let videoAuthor = '';
+    let prompt = '';
+
+    try {
+      console.log(`Fetching metadata for: ${tiktokUrl}`);
+      const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(tiktokUrl)}`;
+      const oembedResponse = await fetch(oembedUrl);
+      if (oembedResponse.ok) {
+        const oembedData = await oembedResponse.json();
+        videoTitle = oembedData.title || '';
+        videoAuthor = oembedData.author_name || '';
+        console.log(`Found metadata: Title - "${videoTitle}", Author - "${videoAuthor}"`);
+      } else {
+        console.warn(`Could not fetch TikTok oEmbed metadata. Status: ${oembedResponse.status}`);
+      }
+    } catch (oembedError) {
+      console.warn('Failed to fetch or parse TikTok oEmbed data:', oembedError);
+    }
+
+    if (videoTitle && videoAuthor) {
+      prompt = `From the TikTok video titled "${videoTitle}" by author "${videoAuthor}" (URL: ${tiktokUrl}), please extract the recipe.`;
+    } else {
+      // Fallback to the original prompt if metadata couldn't be fetched
+      console.warn('Falling back to basic prompt.');
+      prompt = `From the TikTok video at ${tiktokUrl}, extract the recipe.`;
+    }
+    // --- End of new logic ---
+
+    console.log("Using prompt:", prompt);
+    
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const recipeSchema = {
@@ -56,8 +89,6 @@ app.post('/analyze', async (req: ExpressRequest, res: ExpressResponse) => {
       },
       required: ["recipeName", "description", "ingredients", "instructions"],
     };
-
-    const prompt = `From the TikTok video at ${tiktokUrl}, extract the recipe.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
