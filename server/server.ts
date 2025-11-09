@@ -13,7 +13,7 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
-type Platform = 'tiktok' | 'youtube' | 'instagram' | 'website';
+type Platform = 'tiktok' | 'youtube' | 'website';
 
 interface Recipe {
   recipeName: string;
@@ -25,7 +25,6 @@ interface Recipe {
 const getPlatform = (url: string): Platform => {
   if (url.includes('tiktok.com')) return 'tiktok';
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-  if (url.includes('instagram.com')) return 'instagram';
   return 'website';
 }
 
@@ -79,9 +78,6 @@ app.post('/analyze', async (req: Request, res: Response) => {
         console.warn('Falling back to basic prompt for URL:', sourceUrl);
         prompt = `From the ${platformName} video at ${sourceUrl}, extract the recipe.`;
       }
-    } else if (platform === 'instagram') {
-        systemInstruction = "You are an expert recipe bot. Your task is to analyze an Instagram post and extract the recipe from it. Use all available information, including the post's caption, user comments, and by inferring the content of the video based on its description, to piece together the recipe. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations. If you cannot confidently determine a recipe, your response should indicate that a recipe could not be found.";
-        prompt = `From the Instagram post at ${sourceUrl}, please extract the recipe.`;
     } else { // 'website'
       systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage. Ignore all non-recipe content like headers, footers, navigation bars, ads, and user comments. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
       prompt = `Please extract the recipe from the content of the following URL: ${sourceUrl}.`;

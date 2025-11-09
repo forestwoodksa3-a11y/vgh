@@ -39,7 +39,7 @@ function App() {
             Video Recipe Finder
           </h1>
           <p className="mt-2 text-lg text-gray-400">
-            Paste a TikTok, YouTube, or Instagram video URL to extract the recipe.
+            Paste a video or recipe URL from TikTok, YouTube, or a public website to extract the recipe.
           </p>
         </header>
 
