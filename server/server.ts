@@ -43,13 +43,6 @@ app.post('/analyze', async (req: Request, res: Response) => {
 
   const platform = getPlatform(sourceUrl);
 
-  // Handle unsupported Instagram URLs gracefully before making an API call
-  if (platform === 'instagram') {
-    return res.status(400).json({ 
-      error: "Recipe extraction from Instagram is not supported due to their strict content privacy and access restrictions. Please try a URL from TikTok, YouTube, or a public recipe website." 
-    });
-  }
-
   try {
     let prompt = '';
     let systemInstruction = '';
@@ -86,8 +79,10 @@ app.post('/analyze', async (req: Request, res: Response) => {
         console.warn('Falling back to basic prompt for URL:', sourceUrl);
         prompt = `From the ${platformName} video at ${sourceUrl}, extract the recipe.`;
       }
-
-    } else {
+    } else if (platform === 'instagram') {
+        systemInstruction = "You are an expert recipe bot. Your task is to analyze an Instagram post and extract the recipe from it. Use all available information, including the post's caption, user comments, and by inferring the content of the video based on its description, to piece together the recipe. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations. If you cannot confidently determine a recipe, your response should indicate that a recipe could not be found.";
+        prompt = `From the Instagram post at ${sourceUrl}, please extract the recipe.`;
+    } else { // 'website'
       systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage. Ignore all non-recipe content like headers, footers, navigation bars, ads, and user comments. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
       prompt = `Please extract the recipe from the content of the following URL: ${sourceUrl}.`;
     }
