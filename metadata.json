@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Gemini Video Analyzer",
+  "description": "An intelligent web application that uses Gemini to analyze video content. Upload a video, provide a prompt, and receive a detailed, AI-generated analysis of the video's content.",
+  "requestFramePermissions": []
+}
