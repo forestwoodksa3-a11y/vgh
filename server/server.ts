@@ -1,5 +1,5 @@
-// Fix: aliased Request and Response to avoid conflict with global types which can occur in some TypeScript environments.
-import express, { Request as ExpressRequest, Response as ExpressResponse } from 'express';
+// Fix: Changed express import to default and used qualified types to fix type resolution errors.
+import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI, Type } from '@google/genai';
 import { config } from 'dotenv';
@@ -22,8 +22,8 @@ const getPlatform = (url: string): Platform => {
   return 'website';
 }
 
-// Fix: Use aliased types for Request and Response.
-app.post('/analyze', async (req: ExpressRequest, res: ExpressResponse) => {
+// Fix: Use qualified types for Request and Response from the express import.
+app.post('/analyze', async (req: express.Request, res: express.Response) => {
   const { sourceUrl } = req.body;
 
   if (!sourceUrl) {
@@ -36,37 +36,42 @@ app.post('/analyze', async (req: ExpressRequest, res: ExpressResponse) => {
 
   const platform = getPlatform(sourceUrl);
 
+  // Handle unsupported Instagram URLs gracefully before making an API call
+  if (platform === 'instagram') {
+    return res.status(400).json({ 
+      error: "Recipe extraction from Instagram is not supported due to their strict content privacy and access restrictions. Please try a URL from TikTok, YouTube, or a public recipe website." 
+    });
+  }
+
   try {
     let prompt = '';
     let systemInstruction = '';
 
-    if (platform === 'tiktok' || platform === 'youtube' || platform === 'instagram') {
-      // Logic for Video Platforms
+    if (platform === 'tiktok' || platform === 'youtube') {
+      // Logic for Supported Video Platforms
       systemInstruction = "You are an expert recipe bot. Your task is to analyze a video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
       
       let videoTitle = '';
       let videoAuthor = '';
       
       // For TikTok and YouTube, we can try to fetch metadata to improve accuracy
-      if (platform === 'tiktok' || platform === 'youtube') {
-        try {
-          const oembedUrl = platform === 'tiktok'
-            ? `https://www.tiktok.com/oembed?url=${encodeURIComponent(sourceUrl)}`
-            : `https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}`;
-            
-          console.log(`Fetching metadata for ${platform}: ${oembedUrl}`);
-          const oembedResponse = await fetch(oembedUrl);
-          if (oembedResponse.ok) {
-            const oembedData = await oembedResponse.json();
-            videoTitle = oembedData.title || '';
-            videoAuthor = oembedData.author_name || '';
-            console.log(`Found metadata: Title - "${videoTitle}", Author - "${videoAuthor}"`);
-          } else {
-            console.warn(`Could not fetch ${platform} oEmbed metadata. Status: ${oembedResponse.status}`);
-          }
-        } catch (oembedError) {
-          console.warn(`Failed to fetch or parse ${platform} oEmbed data:`, oembedError);
+      try {
+        const oembedUrl = platform === 'tiktok'
+          ? `https://www.tiktok.com/oembed?url=${encodeURIComponent(sourceUrl)}`
+          : `https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}`;
+          
+        console.log(`Fetching metadata for ${platform}: ${oembedUrl}`);
+        const oembedResponse = await fetch(oembedUrl);
+        if (oembedResponse.ok) {
+          const oembedData = await oembedResponse.json();
+          videoTitle = oembedData.title || '';
+          videoAuthor = oembedData.author_name || '';
+          console.log(`Found metadata: Title - "${videoTitle}", Author - "${videoAuthor}"`);
+        } else {
+          console.warn(`Could not fetch ${platform} oEmbed metadata. Status: ${oembedResponse.status}`);
         }
+      } catch (oembedError) {
+        console.warn(`Failed to fetch or parse ${platform} oEmbed data:`, oembedError);
       }
 
       // Construct the prompt based on available data
@@ -74,7 +79,7 @@ app.post('/analyze', async (req: ExpressRequest, res: ExpressResponse) => {
       if (videoTitle && videoAuthor) {
         prompt = `From the ${platformName} video titled "${videoTitle}" by author "${videoAuthor}" (URL: ${sourceUrl}), please extract the recipe.`;
       } else {
-        // Fallback for Instagram or if metadata fetch fails
+        // Fallback if metadata fetch fails
         console.warn('Falling back to basic prompt for URL:', sourceUrl);
         prompt = `From the ${platformName} video at ${sourceUrl}, extract the recipe.`;
       }
