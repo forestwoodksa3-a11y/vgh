@@ -18,6 +18,7 @@ type Platform = 'tiktok' | 'youtube' | 'website';
 interface RecipeImage {
   url: string;
   description: string;
+  category: 'main' | 'step' | 'additional';
 }
 
 interface Recipe {
@@ -86,8 +87,8 @@ app.post('/analyze', async (req: Request, res: Response) => {
       prompt = `Analyze the ${platformName} video ${titleAuthorInfo} available at this URL: ${sourceUrl}. Extract a detailed recipe from the video's content. Your response must include the following details if they are available: ingredients with precise quantities, step-by-step instructions for preparation, the preparation time, the cooking time, and the number of servings this recipe yields.`;
 
     } else { // 'website'
-      systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage, including any images. Ignore all non-recipe content like headers, footers, navigation bars, ads, and user comments. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
-      prompt = `Scrape the recipe from the webpage at this URL: ${sourceUrl}. Extract the following details: the recipe's name, a brief description of the dish, all ingredients with their quantities, the complete step-by-step instructions, the preparation time, the cooking time, the number of servings, and all relevant images. For each image, you must provide its full, direct URL and a concise description of what the image shows.`;
+      systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage, including all relevant images. You MUST ignore all non-recipe content like headers, footers, navigation bars, ads, user comments, and any sections containing links to other recipes (e.g., 'More Recipes', 'You Might Also Like'). Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
+      prompt = `Scrape the recipe from the webpage at this URL: ${sourceUrl}. Extract the exact step-by-step instructions and ingredients from the main body of the page. Extract the following details: the recipe's name, a brief description of the dish, the preparation time, the cooking time, the number of servings, and all relevant images. You must categorize each image found: 1. The primary 'main' image of the finished dish (the hero or thumbnail image). 2. Any 'step' images that visually correspond to a specific instruction. 3. Any other 'additional' photos of the dish. For each image, provide its full, direct URL, a concise description, and its category ('main', 'step', or 'additional').`;
     }
 
     console.log("Using prompt:", prompt);
@@ -107,14 +108,19 @@ app.post('/analyze', async (req: Request, res: Response) => {
     if (platform === 'website') {
       properties.images = { 
         type: Type.ARRAY, 
-        description: "A list of relevant image URLs from the webpage, including the main dish photo and any step-by-step images. For each image, provide its full URL and a brief description of what it depicts.",
+        description: "A list of relevant images from the webpage. Each image must be categorized as 'main', 'step', or 'additional'.",
         items: { 
           type: Type.OBJECT, 
           properties: {
             url: { type: Type.STRING, description: "The full, direct URL to the image file." },
-            description: { type: Type.STRING, description: "A brief description of the image content." }
+            description: { type: Type.STRING, description: "A brief description of the image content." },
+            category: { 
+              type: Type.STRING, 
+              description: "The category of the image: 'main' for the primary dish photo, 'step' for an instructional photo, or 'additional' for other relevant photos.",
+              enum: ['main', 'step', 'additional']
+            }
           },
-          required: ["url", "description"]
+          required: ["url", "description", "category"]
         } 
       };
     }
@@ -176,22 +182,38 @@ app.post('/analyze', async (req: Request, res: Response) => {
       recipe.servings ? `<li><strong class="font-semibold text-indigo-400">Servings:</strong> ${recipe.servings}</li>` : '',
     ].filter(Boolean).join('');
 
-    const imagesHtml = recipe.images?.map(img => `
+    const mainImage = recipe.images?.find(img => img.category === 'main');
+    const otherImages = recipe.images?.filter(img => img.category !== 'main') || [];
+
+    const mainImageHtml = mainImage ? `
       <figure class="my-4">
-        <img src="${img.url}" alt="${img.description}" class="w-full h-auto rounded-lg shadow-md object-cover" loading="lazy" />
-        <figcaption class="text-center text-sm text-gray-400 mt-2">${img.description}</figcaption>
+        <img src="${mainImage.url}" alt="${mainImage.description}" class="w-full h-auto rounded-lg shadow-md object-cover" loading="lazy" />
+        <figcaption class="text-center text-sm text-gray-400 mt-2">${mainImage.description}</figcaption>
       </figure>
-    `).join('') || '';
+    ` : '';
+    
+    const otherImagesHtml = otherImages.length > 0 ? `
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 my-4">
+        ${otherImages.map(img => `
+          <figure>
+            <img src="${img.url}" alt="${img.description}" class="w-full h-auto rounded-lg shadow-md object-cover aspect-square" loading="lazy" />
+            <figcaption class="text-center text-xs text-gray-400 mt-1">${img.description}</figcaption>
+          </figure>
+        `).join('')}
+      </div>
+    ` : '';
 
     const ingredientsHtml = recipe.ingredients.map(item => `<li>${item}</li>`).join('');
     const instructionsHtml = recipe.instructions.map(item => `<li>${item}</li>`).join('');
 
     const recipeHtml = `
       <div>
-        ${imagesHtml.length > 0 ? `<div class="mb-6">${imagesHtml}</div>` : ''}
+        ${mainImageHtml}
         <h3 class="text-3xl font-bold !text-purple-300 !mt-0">${recipe.recipeName}</h3>
         <p class="!text-gray-300 italic mt-2">${recipe.description}</p>
         
+        ${otherImagesHtml}
+
         ${additionalInfoHtml.length > 0 ? `
           <div class="my-6 p-4 bg-gray-900/70 rounded-lg border border-gray-700">
             <ul class="flex flex-wrap items-center gap-x-6 gap-y-2 !text-gray-300">
