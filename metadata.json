@@ -1,5 +1,5 @@
 {
   "name": "Universal AI Recipe Finder",
-  "description": "An intelligent web application that uses Gemini to extract and format recipes from any video (YouTube, TikTok, Instagram) or website URL.",
+  "description": "An intelligent web application that uses Gemini to extract recipes from any URL, whether it's a video from TikTok, YouTube, and Instagram, or a recipe from a website.",
   "requestFramePermissions": []
 }

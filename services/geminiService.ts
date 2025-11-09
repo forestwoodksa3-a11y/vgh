@@ -1,6 +1,8 @@
 export async function getRecipeFromUrl(
   sourceUrl: string,
 ): Promise<string> {
+  // This should point to your backend server.
+  // For local development, the Express server runs on port 3001.
   const backendUrl = 'http://localhost:3001/analyze';
 
   try {
@@ -22,6 +24,7 @@ export async function getRecipeFromUrl(
   } catch(e) {
       console.error(e);
       if (e instanceof Error) {
+          // Provide a more user-friendly error message
           if (e.message.includes('Failed to fetch')) {
               throw new Error("Could not connect to the backend server. Is it running?");
           }

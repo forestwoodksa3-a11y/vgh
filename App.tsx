@@ -47,7 +47,7 @@ function App() {
             Universal AI Recipe Finder
           </h1>
           <p className="mt-2 text-lg text-gray-400">
-            Paste a link from a website, YouTube, TikTok, or Instagram to get the recipe.
+            Paste any video or website URL to instantly extract the recipe.
           </p>
         </header>
 
@@ -60,7 +60,7 @@ function App() {
                 type="url"
                 value={sourceUrl}
                 onChange={(e) => setSourceUrl(e.target.value)}
-                placeholder="https://... (website or video link)"
+                placeholder="https://... (any recipe video or website)"
                 className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
                 disabled={isLoading}
               />
@@ -91,7 +91,7 @@ function App() {
               {isLoading && (
                 <div className="flex flex-col items-center justify-center h-full">
                   <Loader />
-                  <p className="mt-4 text-gray-400">Finding and formatting recipe...</p>
+                  <p className="mt-4 text-gray-400">Finding your recipe...</p>
                 </div>
               )}
               {error && <p className="text-red-400 whitespace-pre-wrap">{error}</p>}
@@ -117,7 +117,7 @@ function App() {
               )}
               {!isLoading && !error && !recipe && (
                 <div className="flex items-center justify-center h-full text-center text-gray-500">
-                  <p>Your formatted recipe will appear here.</p>
+                  <p>Your recipe will appear here.</p>
                 </div>
               )}
             </div>
