@@ -1,6 +1,8 @@
-import express, { Request, Response } from 'express';
+// FIX: Alias Request and Response to ExpressRequest and ExpressResponse to prevent
+// potential type conflicts with global DOM types that can cause compilation errors.
+import express, { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import cors from 'cors';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { config } from 'dotenv';
 
 // Load environment variables from .env file
@@ -12,30 +14,11 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
-// A placeholder function for video processing.
-// In a real-world application, this function would download the video from the URL
-// and use a library like `ffmpeg` to extract frames into base64 strings.
-// This is a complex operation and requires server-side binary dependencies.
-async function getVideoFramesFromUrl(url: string): Promise<string[]> {
-  console.log(`Simulating download and frame extraction for: ${url}`);
-  // This is a mock implementation.
-  // A real implementation would involve:
-  // 1. Using a library like 'tiktok-scraper' or a similar API to get a direct video download link.
-  // 2. Downloading the video buffer.
-  // 3. Using 'fluent-ffmpeg' to spawn an ffmpeg process, extract N frames, and save them as temporary files or stream them to buffers.
-  // 4. Converting each frame buffer to a base64 string.
-  
-  // For this example, we'll return an empty array and let Gemini handle the error gracefully.
-  // In a real scenario, you'd throw an error if frame extraction fails.
-  console.warn("Frame extraction is not implemented in this simulation. The Gemini API call will likely fail without video frames.");
-  return [];
-}
+app.post('/analyze', async (req: ExpressRequest, res: ExpressResponse) => {
+  const { tiktokUrl } = req.body;
 
-app.post('/analyze', async (req: Request, res: Response) => {
-  const { prompt, tiktokUrl } = req.body;
-
-  if (!prompt || !tiktokUrl) {
-    return res.status(400).json({ error: 'Missing prompt or tiktokUrl in request body' });
+  if (!tiktokUrl) {
+    return res.status(400).json({ error: 'Missing tiktokUrl in request body' });
   }
 
   if (!process.env.API_KEY) {
@@ -45,37 +28,53 @@ app.post('/analyze', async (req: Request, res: Response) => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // In a real implementation, you would extract frames from the downloaded TikTok video.
-    // const base64Frames = await getVideoFramesFromUrl(tiktokUrl);
-    // if (base64Frames.length === 0) {
-    //   throw new Error("Could not extract any frames from the video.");
-    // }
-    // const imageParts = base64Frames.map(frame => ({
-    //   inlineData: {
-    //     data: frame,
-    //     mimeType: 'image/jpeg',
-    //   },
-    // }));
-
-    // The current Gemini models do not directly support video URLs for analysis.
-    // The prompt is being sent with a textual representation of the request.
-    const fullPrompt = `Analyze the content of the TikTok video found at this URL: ${tiktokUrl}. The user's specific request is: "${prompt}"`;
-
-    const textPart = {
-      text: fullPrompt,
+    const recipeSchema = {
+      type: Type.OBJECT,
+      properties: {
+        recipeName: {
+          type: Type.STRING,
+          description: "The title or name of the recipe.",
+        },
+        description: {
+          type: Type.STRING,
+          description: "A brief, enticing description of the dish.",
+        },
+        ingredients: {
+          type: Type.ARRAY,
+          description: "A list of all ingredients with quantities and preparation notes.",
+          items: {
+            type: Type.STRING,
+          },
+        },
+        instructions: {
+          type: Type.ARRAY,
+          description: "A step-by-step list of instructions to prepare the dish.",
+          items: {
+            type: Type.STRING,
+          },
+        },
+      },
+      required: ["recipeName", "description", "ingredients", "instructions"],
     };
-    
+
+    const prompt = `From the TikTok video at ${tiktokUrl}, extract the recipe.`;
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: { parts: [textPart /*, ...imageParts */] }, // imageParts would be included here
+      contents: prompt,
+      config: {
+        systemInstruction: "You are an expert recipe bot. Your task is to analyze a TikTok video and extract the recipe from it. Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.",
+        responseMimeType: "application/json",
+        responseSchema: recipeSchema,
+      },
     });
 
-    res.json({ analysis: response.text });
+    res.json({ recipe: response.text });
 
   } catch (error) {
     console.error('Error during Gemini API call:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-    res.status(500).json({ error: `Failed to analyze video. ${errorMessage}` });
+    res.status(500).json({ error: `Failed to get recipe. ${errorMessage}` });
   }
 });
 

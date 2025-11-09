@@ -1,5 +1,4 @@
 export async function analyzeTiktokVideo(
-  prompt: string,
   tiktokUrl: string,
 ): Promise<string> {
   // This should point to your backend server.
@@ -12,7 +11,7 @@ export async function analyzeTiktokVideo(
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt, tiktokUrl }),
+        body: JSON.stringify({ tiktokUrl }),
     });
 
     if (!response.ok) {
@@ -21,7 +20,7 @@ export async function analyzeTiktokVideo(
     }
 
     const data = await response.json();
-    return data.analysis;
+    return data.recipe;
   } catch(e) {
       console.error(e);
       if (e instanceof Error) {
