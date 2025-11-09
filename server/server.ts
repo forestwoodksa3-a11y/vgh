@@ -84,7 +84,18 @@ app.post('/analyze', async (req: Request, res: Response) => {
       const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
       const titleAuthorInfo = (videoTitle && videoAuthor) ? `titled "${videoTitle}" by author "${videoAuthor}"` : '';
 
-      prompt = `Analyze the ${platformName} video ${titleAuthorInfo} available at this URL: ${sourceUrl}. Extract a detailed recipe from the video's content. Your response must include the following details if they are available: ingredients with precise quantities, step-by-step instructions for preparation, the preparation time, the cooking time, and the number of servings this recipe yields.`;
+      prompt = `Your primary task is to extract a recipe from the ${platformName} video located at the URL: ${sourceUrl}. The video is reportedly ${titleAuthorInfo}.
+
+Carefully analyze the video's content from beginning to end. Your analysis must be based *only* on the visual and audio information present in the video itself. Do not infer or guess details not shown or mentioned.
+
+From the video, extract the following information with the highest possible accuracy:
+1.  **Recipe Name:** The name of the dish being made.
+2.  **Description:** A short summary of the final dish.
+3.  **Ingredients:** A complete list of all ingredients shown or mentioned, including precise quantities and measurements (e.g., "1 cup flour", "2 tbsp olive oil").
+4.  **Instructions:** A step-by-step guide on how to make the recipe, as demonstrated in the video.
+5.  **Prep Time:** The preparation time, if mentioned.
+6.  **Cook Time:** The cooking time, if mentioned.
+7.  **Servings:** The number of servings the recipe makes, if mentioned.`;
 
     } else { // 'website'
       systemInstruction = "You are an expert recipe web scraper and formatter. Your task is to extract only the core recipe content from the provided URL's webpage, including all relevant images. You MUST ignore all non-recipe content like headers, footers, navigation bars, ads, user comments, and any sections containing links to other recipes (e.g., 'More Recipes', 'You Might Also Like'). Respond only with the recipe in a structured JSON format that adheres to the provided schema. Do not include any other text, greetings, or explanations.";
